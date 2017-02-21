@@ -1,5 +1,6 @@
 {
-  "name": "Simple HTTP Server w/o concurrency",
+  "name": "madkom/simple-http",
+  "description": "Simple HTTP Server w/o concurrency",
   "type": "library",
   "autoload": {
     "psr-4": {
