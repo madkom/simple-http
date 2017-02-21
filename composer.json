@@ -1,0 +1,19 @@
+{
+  "name": "Simple HTTP Server w/o concurrency",
+  "type": "library",
+  "autoload": {
+    "psr-4": {
+      "Madkom\\SimpleHTTP\\": "src/"
+    }
+  },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Michał Brzuchalski",
+      "email": "m.brzuchalski@madkom.pl"
+    }
+  ],
+  "config": {
+    "bin-dir": "bin"
+  }
+}
