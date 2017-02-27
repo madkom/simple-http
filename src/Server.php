@@ -9,22 +9,39 @@ final class Server
      * @var Router
      */
     private $router;
+    private $debug = false;
+    private $terminate = false;
 
-    public function __construct(string $host, int $port)
+    public function __construct(string $host, int $port, bool $debug)
     {
+        \pcntl_async_signals(true);
+        \pcntl_signal(SIGTERM,  function() {
+            $this->terminate = true;
+            $this->log('HTTP Server gracefully terminating by SIGTERM');
+        });
         $this->socket = @\stream_socket_server("tcp://{$host}:{$port}", $errNo, $errStr);
         if (false === $this->socket) {
             $this->error($errStr);
         }
         \stream_set_blocking($this->socket, true);
-        $this->log("HTTP Server started on {$host}:{$port}");
+        $pid = \posix_getpid();
+        $this->log("HTTP Server started on {$host}:{$port} [PID:{$pid}]");
         $this->router = new Router();
+        $this->debug = $debug;
     }
 
     public function get(string $path, callable $callback) : self
     {
         $callback = \Closure::bind($callback, $this, self::class);
         $this->router->add(new Route('GET', $path, $callback));
+
+        return $this;
+    }
+
+    public function head(string $path, callable $callback) : self
+    {
+        $callback = \Closure::bind($callback, $this, self::class);
+        $this->router->add(new Route('HEAD', $path, $callback));
 
         return $this;
     }
@@ -45,12 +62,31 @@ final class Server
         return $this;
     }
 
+    public function patch(string $path, callable $callback): self
+    {
+        $callback = \Closure::bind($callback, $this, self::class);
+        $this->router->add(new Route('PATCH', $path, $callback));
+
+        return $this;
+    }
+
+    public function delete(string $path, callable $callback): self
+    {
+        $callback = \Closure::bind($callback, $this, self::class);
+        $this->router->add(new Route('DELETE', $path, $callback));
+
+        return $this;
+    }
+
     public function run(callable $callback)
     {
         $this->router->fallback(\Closure::bind($callback, $this, self::class));
-        $this->log('Accepting connections');
+        $this->debug && $this->log('Accepting connections');
         while (true) {
             try {
+                if ($this->terminate) {
+                    break;
+                }
                 if (!$clientSocket = @\stream_socket_accept($this->socket)) {
                     continue;
                 }
@@ -70,7 +106,7 @@ final class Server
                     );
 
                 } else {
-                    $this->log("Handled request({$request->getMethod()} {$request->getPath()} {$response->getStatus()})");
+                    $this->debug && $this->log("Handled request({$request->getMethod()} {$request->getPath()} {$response->getStatus()})");
                 }
             } catch (\Throwable $error) {
                 $this->log("Internal error: {$error->getMessage()} on {$error->getLine()}", "\033[0;33m");
@@ -92,6 +128,7 @@ final class Server
         $method = 'GET';
         $path = '/';
         $http = 1.0;
+        /** @noinspection ForeachInvariantsInspection */
         for ($i = 0; $i < $count; $i++) {
             $line = $lines[$i];
             if (0 === $i) {

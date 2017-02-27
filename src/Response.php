@@ -4,12 +4,14 @@ namespace Madkom\SimpleHTTP;
 class Response
 {
     protected const OK  = 200;
+    protected const CREATED = 201;
     protected const NO_CONTENT = 204;
     protected const BAD_REQUEST = 400;
     protected const NOT_FOUND = 404;
     protected const INTERNAL_SERVER_ERROR = 500;
     protected const STATUS = [
         self::OK => 'OK',
+        self::CREATED => 'Created',
         self::NO_CONTENT => 'No Content',
         self::BAD_REQUEST => 'Bad Request',
         self::NOT_FOUND => 'Not Found',
@@ -28,6 +30,9 @@ class Response
         if ($status !== 204) {
             $this->headers['Content-Type'] = $this->headers['Content-Type'] ?? 'text/plain';
             $this->headers['Content-Length'] = \is_string($content) ? \strlen($this->content) : 0;
+        } else {
+            $this->content = null;
+            unset($this->headers['Content-Type'], $this->headers['Content-Length']);
         }
         $this->build();
     }

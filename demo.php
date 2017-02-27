@@ -5,7 +5,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 $data = [];
 $cache = [];
 
-$server = new Server('0.0.0.0', $argc > 1 ? (int)$argv[1] : 80);
+$server = new Server('0.0.0.0', $argc > 1 ? (int)$argv[1] : 80, $argc > 2 ? (bool)($argv[2] === '-v') : false);
 $server
     ->get('/config', function (Request $request) use (&$data, &$cache) : Response {
         if (\array_key_exists('config', $cache)) {

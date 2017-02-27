@@ -8,6 +8,7 @@ final class Request
     private $http = 1.0;
     private $content = '';
     private $headers = [];
+    private $payload;
 
     public function __construct(string $method, string $path = '/', float $http = 1.0, ?string $content = null, array $headers = [])
     {
@@ -16,6 +17,25 @@ final class Request
         $this->http = $http;
         $this->content = $content;
         $this->headers = $headers;
+        $type = null;
+        $charset = '';
+        if (true === \array_key_exists('content-type', $this->headers)) {
+            @list($type, $charset) = \explode(';', $this->headers['content-type']);
+        }
+        switch ($type ?? null) {
+            case 'application/x-www-form-urlencoded':
+                $charset = \str_replace([' ', 'charset='], '', $charset);
+                \parse_str(\iconv($charset, 'utf8', \urldecode($content)), $this->payload);
+                break;
+            case 'application/json':
+                $this->payload = \json_decode($content, true);
+                if (empty($content) && \json_last_error()) {
+                    throw new \RuntimeException('Malformed request: ' . \json_last_error_msg());
+                }
+                break;
+            default:
+                $this->payload = $content;
+        }
     }
 
     public function getMethod() : string
@@ -23,9 +43,14 @@ final class Request
         return $this->method;
     }
 
-    public function isPut() : bool
+    public function isGet() : bool
     {
-        return 'PUT' === $this->method;
+        return 'GET' === $this->method;
+    }
+
+    public function isHead() : bool
+    {
+        return 'HEAD' === $this->method;
     }
 
     public function isPost() : bool
@@ -33,9 +58,19 @@ final class Request
         return 'POST' === $this->method;
     }
 
-    public function isGet() : bool
+    public function isPut() : bool
     {
-        return 'GET' === $this->method;
+        return 'PUT' === $this->method;
+    }
+
+    public function isPatch(): bool
+    {
+        return 'PATCH' === $this->method;
+    }
+
+    public function isDelete(): bool
+    {
+        return 'DELETE' === $this->method;
     }
 
     public function getPath() : string
@@ -56,5 +91,10 @@ final class Request
     public function getHeaders() : array
     {
         return $this->headers;
+    }
+
+    public function getPayload()
+    {
+        return $this->payload;
     }
 }
