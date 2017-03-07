@@ -97,4 +97,15 @@ final class Request
     {
         return $this->payload;
     }
+
+    public function __toString() : string
+    {
+        $headers = '';
+        foreach ($this->headers as $headerName => $headerValue) {
+            $headers .= "{$headerName}: {$headerValue}\r\n";
+        }
+
+        return "{$this->method} {$this->path} HTTP/{$this->http}\r\n{$headers}\r\n\r\n{$this->content}";
+
+    }
 }
