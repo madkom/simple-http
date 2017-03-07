@@ -80,4 +80,36 @@ class Response
 
         return rtrim($result, "\r\n");
     }
+
+    public static function createFromString(string $raw) : self
+    {
+        $lines = \explode("\r\n", $raw);
+        $count = \count($lines);
+        $headers = [];
+        $status = 200;
+        /** @noinspection ForeachInvariantsInspection */
+        for ($i = 0; $i < $count; $i++) {
+            $line = $lines[$i];
+            if (0 === $i) {
+                list($status, $message) = \sscanf($line, '%d');
+                continue;
+            }
+            if (empty($line) && $i + 1 < $count) {
+                $content = '';
+                for ($i++; $i < $count; $i++) {
+                    $content .= $lines[$i];
+                }
+                return new self($status, $content, $headers);
+            }
+            if (!empty($line)) {
+                list($name, $value) = \explode(': ', $line);
+                $headers[\strtolower($name)] = $value;
+            }
+        }
+        if ($i > 0) {
+            return new self($status, null, $headers);
+        }
+
+        throw new \RuntimeException('Malformed response');
+    }
 }

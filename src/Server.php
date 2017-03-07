@@ -122,33 +122,7 @@ final class Server
             return $this->cache[$raw];
         }
 
-        $lines = \explode("\r\n", $raw);
-        $count = \count($lines);
-        $headers = [];
-        $method = 'GET';
-        $path = '/';
-        $http = 1.0;
-        /** @noinspection ForeachInvariantsInspection */
-        for ($i = 0; $i < $count; $i++) {
-            $line = $lines[$i];
-            if (0 === $i) {
-                list($method, $path, $http) = \sscanf($line, '%s %s HTTP/%f');
-                continue;
-            }
-            if (empty($line) && $i + 1 < $count) {
-                $line = $lines[$i + 1];
-                return $this->cache[$raw] = new Request($method, $path, $http, $line, $headers);
-            }
-            if (!empty($line)) {
-                list($name, $value) = \explode(': ', $line);
-                $headers[\strtolower($name)] = $value;
-            }
-        }
-        if ($i > 0) {
-            return $this->cache[$raw] = new Request($method, $path, $http, null, $headers);
-        }
-
-        throw new \RuntimeException('Malformed request');
+        return $this->cache[$raw] = Request::createFromString($raw);
     }
 
     protected function log(string $msg, string $color = "\033[0;32m")
