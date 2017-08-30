@@ -27,12 +27,6 @@ final class Server
         if (false === $this->socket) {
             $this->error($errStr);
         }
-        \pcntl_signal(SIGKILL, function () {
-            \fclose($this->socket);
-            $this->log('HTTP Server force terminating by SIGKILL');
-            exit(0);
-        });
-
         \stream_set_blocking($this->socket, true);
         $pid = \posix_getpid();
         $this->log("HTTP Server started on {$host}:{$port} [PID:{$pid}]");
