@@ -9,7 +9,8 @@ final class Server
      * @var Router
      */
     private $router;
-    private $debug = false;
+    /** @var bool */
+    private $debug;
     private $terminate = false;
 
     public function __construct(string $host, int $port, bool $debug)
@@ -19,10 +20,19 @@ final class Server
             $this->terminate = true;
             $this->log('HTTP Server gracefully terminating by SIGTERM');
         });
-        $this->socket = @\stream_socket_server("tcp://{$host}:{$port}", $errNo, $errStr);
+        $context = \stream_context_create([
+            'socket' => ['so_reuseport' => true],
+        ]);
+        $this->socket = @\stream_socket_server("tcp://{$host}:{$port}", $errNo, $errStr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN , $context);
         if (false === $this->socket) {
             $this->error($errStr);
         }
+        \pcntl_signal(SIGKILL, function () {
+            \fclose($this->socket);
+            $this->log('HTTP Server force terminating by SIGKILL');
+            exit(0);
+        });
+
         \stream_set_blocking($this->socket, true);
         $pid = \posix_getpid();
         $this->log("HTTP Server started on {$host}:{$port} [PID:{$pid}]");
@@ -81,37 +91,51 @@ final class Server
     public function run(callable $callback)
     {
         $this->router->fallback(\Closure::bind($callback, $this, self::class));
-        $this->debug && $this->log('Accepting connections');
+        assert($this->debug && $this->log('Accepting connections'));
         while (true) {
             try {
                 if ($this->terminate) {
                     break;
                 }
-                if (!$clientSocket = @\stream_socket_accept($this->socket)) {
+                if (!$clientSocket = @\stream_socket_accept($this->socket, $timeout = 1, $peerName)) {
                     continue;
                 }
-                $request = $this->decode(\fread($clientSocket, 8192));
-                try {
-                    $response = $this->router->dispatch($request);
-                } catch (\Exception $exception) {
-                    $response = new Response(500, "Error: {$exception->getMessage()}");
-                }
-                \fwrite($clientSocket, (string)$response);
-                \fclose($clientSocket);
-                if ($response->getStatus() >= 300) {
-                    $this->log(
-                        "Failed request({$request->getMethod()} {$request->getPath()} {$response->getStatus()}) "
-                        . $response->getContent(),
-                        "\033[0;33m"
-                    );
+                $buf = \stream_socket_recvfrom($clientSocket, 8192);
+//                $buf = \stream_get_contents($clientSocket);
+//                $buf = \fread($clientSocket, 8192);
 
+                $meta = \stream_get_meta_data($clientSocket);
+                if (true === $meta['timed_out']) {
+                    $response = new Response(408);
                 } else {
-                    $this->debug && $this->log("Handled request({$request->getMethod()} {$request->getPath()} {$response->getStatus()})");
+                    if (empty($buf)) {
+                        $response = new Response(400);
+                    } else {
+                        $request = $this->decode($buf);
+                        try {
+                            $response = $this->router->dispatch($request);
+                        } catch (\Exception $exception) {
+                            $response = new Response(500, "Error: {$exception->getMessage()}");
+                        }
+                    }
+                }
+                \stream_socket_sendto($clientSocket, (string)$response);
+//                \fclose($clientSocket);
+                if ($response->getStatus() >= 300) {
+                    assert(function () use ($request, $response) {
+                        $this->log(
+                            "Failed request({$request->getMethod()} {$request->getPath()} {$response->getStatus()}) "
+                            . $response->getContent(),
+                            "\033[0;33m"
+                        );
+                    });
+                } else {
+                    assert($this->debug && $this->log("Handled request({$request->getMethod()} {$request->getPath()} {$response->getStatus()})"));
                 }
             } catch (\Throwable $error) {
-                $this->log("Internal error: {$error->getMessage()} on {$error->getLine()}", "\033[0;33m");
+                assert($this->log("Internal error: {$error->getMessage()} on {$error->getLine()}", "\033[0;33m"));
             } catch (\Exception $exception) {
-                $this->log("Internal exception: {$exception->getMessage()}", "\033[0;33m");
+                assert($this->log("Internal exception: {$exception->getMessage()}", "\033[0;33m"));
             }
         }
     }
@@ -125,12 +149,12 @@ final class Server
         return $this->cache[$raw] = Request::createFromString($raw);
     }
 
-    protected function log(string $msg, string $color = "\033[0;32m")
+    private function log(string $msg, string $color = "\033[0;32m")
     {
         \printf("%s[%s] %s\033[0m\n", $color, \date('Y-m-d H:i:s'), $msg);
     }
 
-    protected function error(string $msg)
+    private function error(string $msg)
     {
         $this->log($msg, "\033[0;31m");
         exit(1);

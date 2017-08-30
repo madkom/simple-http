@@ -8,6 +8,7 @@ class Response
     protected const NO_CONTENT = 204;
     protected const BAD_REQUEST = 400;
     protected const NOT_FOUND = 404;
+    protected const REQUEST_TIMEOUT = 408;
     protected const INTERNAL_SERVER_ERROR = 500;
     protected const STATUS = [
         self::OK => 'OK',
@@ -15,6 +16,7 @@ class Response
         self::NO_CONTENT => 'No Content',
         self::BAD_REQUEST => 'Bad Request',
         self::NOT_FOUND => 'Not Found',
+        self::REQUEST_TIMEOUT => 'Request Timeout',
         self::INTERNAL_SERVER_ERROR => 'Internal Server Error',
     ];
     protected $status = self::OK;
@@ -34,6 +36,7 @@ class Response
             $this->content = null;
             unset($this->headers['Content-Type'], $this->headers['Content-Length']);
         }
+        $this->headers['Connection'] = 'close';
         $this->build();
     }
 

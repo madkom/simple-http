@@ -133,6 +133,9 @@ final class Request
             }
         }
         if ($i > 0) {
+            if (!\is_string($method)) {
+                die(print_r(get_defined_vars(), true));
+            }
             return new self($method, $path, $http, null, $headers);
         }
 
